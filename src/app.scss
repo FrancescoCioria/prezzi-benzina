@@ -1,0 +1,292 @@
+// === Design Tokens ===
+$green: #22c55e;
+$yellow: #f59e0b;
+$red: #ef4444;
+$primary: #0ea5e9;
+$primary-dark: #0284c7;
+$surface: #ffffff;
+$text: #1e293b;
+$text-secondary: #64748b;
+$border: #e2e8f0;
+$shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+$shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
+$shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06);
+$radius-sm: 10px;
+$radius-md: 16px;
+$radius-lg: 24px;
+$transition: 0.2s ease;
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: $text;
+  background: #f8fafc;
+}
+
+// === App Layout ===
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  position: relative;
+}
+
+// === Map ===
+#map {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+
+  .mapboxgl-canvas {
+    position: static;
+  }
+
+  .mapboxgl-ctrl-bottom-right {
+    right: 10px;
+    bottom: 10px;
+
+    .mapboxgl-ctrl-group {
+      border-radius: $radius-sm;
+      box-shadow: $shadow-md;
+      border: none;
+      overflow: hidden;
+
+      > button {
+        width: 44px;
+        height: 44px;
+        border: none !important;
+        transition: background $transition;
+
+        &:active {
+          background: #f1f5f9;
+        }
+
+        + button {
+          border-top: 1px solid $border !important;
+        }
+      }
+    }
+  }
+
+  .mapboxgl-ctrl-bottom-left {
+    display: none;
+  }
+}
+
+// === Filter Bar ===
+.filter-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: max(12px, env(safe-area-inset-top)) 12px 10px;
+  background: linear-gradient(
+    to bottom,
+    rgba(248, 250, 252, 0.95) 60%,
+    rgba(248, 250, 252, 0)
+  );
+  pointer-events: none;
+
+  .fuel-pills,
+  .distance-pills {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    pointer-events: auto;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  .pill {
+    flex-shrink: 0;
+    height: 36px;
+    padding: 0 16px;
+    border: none;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all $transition;
+    background: $surface;
+    color: $text-secondary;
+    box-shadow: $shadow-sm;
+
+    &:active {
+      transform: scale(0.96);
+    }
+
+    &.active {
+      background: $primary;
+      color: white;
+      box-shadow: 0 2px 8px rgba($primary, 0.4);
+    }
+  }
+
+  .pill-distance {
+    height: 30px;
+    padding: 0 12px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+}
+
+// === Station List ===
+.station-list {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  max-height: 45vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: $surface;
+  border-radius: $radius-lg $radius-lg 0 0;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.12);
+  padding: 0 12px 20px;
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+  transform: translateY(calc(100% - 16px));
+  transition: transform 0.3s ease;
+
+  &.visible {
+    transform: translateY(0);
+  }
+
+  .list-handle {
+    width: 36px;
+    height: 4px;
+    background: $border;
+    border-radius: 2px;
+    margin: 10px auto 12px;
+    flex-shrink: 0;
+  }
+
+  .list-status {
+    text-align: center;
+    padding: 16px 0;
+    color: $text-secondary;
+    font-size: 14px;
+
+    &.error {
+      color: $red;
+    }
+  }
+}
+
+// === Station Card ===
+.station-card {
+  padding: 12px;
+  border-radius: $radius-sm;
+  margin-bottom: 8px;
+  border: 1.5px solid $border;
+  transition: all $transition;
+  cursor: pointer;
+  position: relative;
+
+  &:active {
+    transform: scale(0.98);
+  }
+
+  &.selected {
+    border-color: $primary;
+    background: rgba($primary, 0.04);
+  }
+
+  .station-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+
+    .ranking {
+      font-size: 12px;
+      font-weight: 700;
+      min-width: 28px;
+      text-align: center;
+
+      &.rank-top {
+        color: $green;
+      }
+      &.rank-mid {
+        color: $yellow;
+      }
+      &.rank-low {
+        color: $red;
+      }
+    }
+
+    .gestore {
+      font-weight: 600;
+      font-size: 15px;
+      flex: 1;
+    }
+
+    .prezzo {
+      font-size: 16px;
+      font-weight: 700;
+      color: $text;
+    }
+  }
+
+  .station-details {
+    .indirizzo {
+      font-size: 12px;
+      color: $text-secondary;
+      display: block;
+      margin-bottom: 4px;
+      text-transform: capitalize;
+    }
+
+    .station-meta {
+      display: flex;
+      gap: 12px;
+      font-size: 11px;
+      color: $text-secondary;
+
+      .self-service {
+        padding: 1px 6px;
+        border-radius: 4px;
+        background: #f1f5f9;
+        font-weight: 500;
+      }
+    }
+  }
+
+  .directions-btn {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: $primary;
+    text-decoration: none;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: rgba($primary, 0.08);
+    transition: background $transition;
+
+    &:active {
+      background: rgba($primary, 0.16);
+    }
+  }
+}
