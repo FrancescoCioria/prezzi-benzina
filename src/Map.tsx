@@ -99,6 +99,32 @@ function buildPopupHTML(props: Record<string, any>): string {
   `;
 }
 
+const RADIUS_SOURCE = "search-radius";
+const RADIUS_FILL_LAYER = "search-radius-fill";
+const RADIUS_LINE_LAYER = "search-radius-line";
+
+function makeCircleGeoJSON(
+  lat: number,
+  lng: number,
+  radiusKm: number,
+  steps = 64
+): GeoJSON.Feature<GeoJSON.Polygon> {
+  const coords: [number, number][] = [];
+  for (let i = 0; i <= steps; i++) {
+    const angle = (i / steps) * 2 * Math.PI;
+    const dx = radiusKm * Math.cos(angle);
+    const dy = radiusKm * Math.sin(angle);
+    const dlat = dy / 111.32;
+    const dlng = dx / (111.32 * Math.cos((lat * Math.PI) / 180));
+    coords.push([lng + dlng, lat + dlat]);
+  }
+  return {
+    type: "Feature",
+    geometry: { type: "Polygon", coordinates: [coords] },
+    properties: {},
+  };
+}
+
 // Haversine distance in km
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371;
@@ -144,10 +170,17 @@ export default function Map() {
       if (controller.signal.aborted) return;
       setDistributori(data);
       const map = mapRef.current;
-      if (map && map.getSource(SOURCE_ID)) {
-        (map.getSource(SOURCE_ID) as MbMap.GeoJSONSource).setData(
-          toGeoJSON(data)
-        );
+      if (map) {
+        if (map.getSource(SOURCE_ID)) {
+          (map.getSource(SOURCE_ID) as MbMap.GeoJSONSource).setData(
+            toGeoJSON(data)
+          );
+        }
+        if (map.getSource(RADIUS_SOURCE)) {
+          (map.getSource(RADIUS_SOURCE) as MbMap.GeoJSONSource).setData(
+            makeCircleGeoJSON(lat, lng, distance)
+          );
+        }
       }
     } catch (e) {
       if (controller.signal.aborted) return;
@@ -223,6 +256,31 @@ export default function Map() {
 
     map.on("load", () => {
       geolocate.trigger();
+
+      // Search radius circle
+      map.addSource(RADIUS_SOURCE, {
+        type: "geojson",
+        data: makeCircleGeoJSON(0, 0, 0),
+      });
+      map.addLayer({
+        id: RADIUS_FILL_LAYER,
+        type: "fill",
+        source: RADIUS_SOURCE,
+        paint: {
+          "fill-color": "#0ea5e9",
+          "fill-opacity": 0.06,
+        },
+      });
+      map.addLayer({
+        id: RADIUS_LINE_LAYER,
+        type: "line",
+        source: RADIUS_SOURCE,
+        paint: {
+          "line-color": "#0ea5e9",
+          "line-width": 1.5,
+          "line-opacity": 0.3,
+        },
+      });
 
       map.addSource(SOURCE_ID, {
         type: "geojson",
