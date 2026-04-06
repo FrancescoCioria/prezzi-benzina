@@ -53,7 +53,7 @@ function formatPrezzo(prezzo: string | number): string {
   return Number(prezzo).toFixed(3).replace(".", ",");
 }
 
-function relativeTime(dateStr: string): string {
+function formatUpdate(dateStr: string): string {
   const [datePart, timePart] = dateStr.split(" ");
   const [day, month, year] = datePart.split("/");
   const date = new Date(`${year}-${month}-${day}T${timePart}`);
@@ -63,12 +63,18 @@ function relativeTime(dateStr: string): string {
   const diffH = Math.floor(diffMin / 60);
   const diffD = Math.floor(diffH / 24);
 
-  if (diffMin < 1) return "adesso";
-  if (diffMin < 60) return `${diffMin} min fa`;
-  if (diffH < 24) return `${diffH} ore fa`;
-  if (diffD === 1) return "ieri";
-  if (diffD < 7) return `${diffD} giorni fa`;
-  return `${parseInt(day)}/${month}/${year}`;
+  let relative: string;
+  if (diffMin < 1) relative = "adesso";
+  else if (diffMin < 60) relative = `${diffMin} min fa`;
+  else if (diffH < 24) relative = `${diffH} ore fa`;
+  else if (diffD === 1) relative = "ieri";
+  else if (diffD < 7) relative = `${diffD} giorni fa`;
+  else relative = "";
+
+  const time = timePart.slice(0, 5);
+  const absolute = `${parseInt(day)}/${month}/${year} ${time}`;
+
+  return relative ? `${relative} (${absolute})` : absolute;
 }
 
 function buildPopupHTML(props: Record<string, any>): string {
@@ -86,7 +92,7 @@ function buildPopupHTML(props: Record<string, any>): string {
         <span>${props.distanza} km</span>
         <span class="popup-badge">${isSelf ? "Self" : "Servito"}</span>
       </div>
-      <div class="popup-updated">Aggiornato ${relativeTime(props.data)}</div>
+      <div class="popup-updated">Aggiornato ${formatUpdate(props.data)}</div>
       <a class="popup-directions" href="${mapsUrl}" target="_blank" rel="noopener noreferrer">Indicazioni</a>
     </div>
   `;
@@ -331,7 +337,7 @@ export default function Map() {
         popupRef.current = new mapboxgl.Popup({
           offset: 20,
           maxWidth: "300px",
-          closeButton: true,
+          closeButton: false,
         })
           .setLngLat(coords)
           .setHTML(buildPopupHTML(props))

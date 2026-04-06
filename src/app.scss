@@ -193,19 +193,6 @@ body,
     overflow: hidden;
   }
 
-  .mapboxgl-popup-close-button {
-    font-size: 18px;
-    padding: 4px 8px;
-    color: $text-secondary;
-    right: 2px;
-    top: 2px;
-
-    &:hover {
-      background: none;
-      color: $text;
-    }
-  }
-
   .mapboxgl-popup-tip {
     border-top-color: $surface;
   }
