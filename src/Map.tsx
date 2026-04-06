@@ -15,6 +15,15 @@ const CLUSTER_LABEL_ID = "distributori-cluster-labels";
 
 const defaultCenter: [number, number] = [9.19, 45.4642]; // Milano
 
+// Map search distance (km) to a zoom level that fits the radius
+function distanceToZoom(km: number): number {
+  if (km <= 3) return 13;
+  if (km <= 5) return 12;
+  if (km <= 10) return 11;
+  if (km <= 15) return 10;
+  return 9;
+}
+
 function toGeoJSON(distributori: Distributore[]): FeatureCollection {
   const prices = distributori.map((d) => d.prezzo);
   const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
@@ -230,6 +239,7 @@ export default function Map() {
   useEffect(() => {
     if (coordsRef.current) {
       fetchAndUpdate(coordsRef.current.lat, coordsRef.current.lng);
+      mapRef.current?.easeTo({ zoom: distanceToZoom(distance) });
     }
   }, [fuel, distance]);
 
@@ -281,7 +291,22 @@ export default function Map() {
     });
 
     map.on("load", () => {
-      geolocate.trigger();
+      // Get position immediately without GeolocateControl animation
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          const { distance } = useAppStore.getState();
+          map.jumpTo({
+            center: [longitude, latitude],
+            zoom: distanceToZoom(distance),
+          });
+          fetchAndUpdate(latitude, longitude);
+        },
+        () => {
+          fetchAndUpdate(defaultCenter[1], defaultCenter[0]);
+        },
+        { enableHighAccuracy: true }
+      );
 
       // Search radius circle
       map.addSource(RADIUS_SOURCE, {
@@ -452,11 +477,9 @@ export default function Map() {
     });
 
     geolocate.on("geolocate", (e: any) => {
+      const { distance } = useAppStore.getState();
+      map.easeTo({ zoom: distanceToZoom(distance) });
       fetchAndUpdate(e.coords.latitude, e.coords.longitude);
-    });
-
-    geolocate.on("error", () => {
-      fetchAndUpdate(defaultCenter[1], defaultCenter[0]);
     });
 
     return () => {
