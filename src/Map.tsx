@@ -16,56 +16,78 @@ const CLUSTER_LABEL_ID = "distributori-cluster-labels";
 const defaultCenter: [number, number] = [9.19, 45.4642]; // Milano
 
 function toGeoJSON(distributori: Distributore[]): FeatureCollection {
+  // Sort prices to compute percentile thresholds
+  const sorted = [...distributori].sort((a, b) => a.prezzo - b.prezzo);
+  const n = sorted.length;
+  const p33 = n > 0 ? sorted[Math.floor(n / 3)]?.prezzo ?? 0 : 0;
+  const p66 = n > 0 ? sorted[Math.floor((n * 2) / 3)]?.prezzo ?? 0 : 0;
+
   return {
     type: "FeatureCollection",
-    features: distributori.map((d) => ({
-      type: "Feature" as const,
-      geometry: {
-        type: "Point" as const,
-        coordinates: [d.longitudine, d.latitudine],
-      },
-      properties: {
-        ranking: d.ranking,
-        gestore: d.gestore,
-        prezzo: d.prezzo.toFixed(3),
-        self: d.self,
-        indirizzo: d.indirizzo,
-        distanza: d.distanza,
-        data: d.data,
-        latitudine: d.latitudine,
-        longitudine: d.longitudine,
-      },
-    })),
+    features: distributori.map((d) => {
+      const color =
+        d.prezzo <= p33 ? "#22c55e" : d.prezzo <= p66 ? "#f59e0b" : "#ef4444";
+      return {
+        type: "Feature" as const,
+        geometry: {
+          type: "Point" as const,
+          coordinates: [d.longitudine, d.latitudine],
+        },
+        properties: {
+          ranking: d.ranking,
+          gestore: d.gestore,
+          prezzo: d.prezzo.toFixed(3).replace(".", ","),
+          prezzo_num: d.prezzo,
+          color,
+          self: d.self,
+          distanza: d.distanza,
+          data: d.data,
+          latitudine: d.latitudine,
+          longitudine: d.longitudine,
+        },
+      };
+    }),
   };
 }
 
-function formatDate(dateStr: string): string {
+function formatPrezzo(prezzo: string | number): string {
+  return Number(prezzo).toFixed(3).replace(".", ",");
+}
+
+function relativeTime(dateStr: string): string {
   const [datePart, timePart] = dateStr.split(" ");
-  const [day, month] = datePart.split("/");
-  const months = [
-    "gen", "feb", "mar", "apr", "mag", "giu",
-    "lug", "ago", "set", "ott", "nov", "dic",
-  ];
-  return `${parseInt(day)} ${months[parseInt(month) - 1]}, ${timePart.slice(0, 5)}`;
+  const [day, month, year] = datePart.split("/");
+  const date = new Date(`${year}-${month}-${day}T${timePart}`);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffH = Math.floor(diffMin / 60);
+  const diffD = Math.floor(diffH / 24);
+
+  if (diffMin < 1) return "adesso";
+  if (diffMin < 60) return `${diffMin} min fa`;
+  if (diffH < 24) return `${diffH} ore fa`;
+  if (diffD === 1) return "ieri";
+  if (diffD < 7) return `${diffD} giorni fa`;
+  return `${parseInt(day)}/${month}/${year}`;
 }
 
 function buildPopupHTML(props: Record<string, any>): string {
   const mapsUrl = `https://maps.google.com/?daddr=${props.latitudine},${props.longitudine}`;
-  const rankClass = props.ranking <= 3 ? "top" : props.ranking <= 10 ? "mid" : "low";
+  const isSelf = props.self === "true" || props.self === true;
 
   return `
     <div class="popup-card">
       <div class="popup-header">
-        <span class="popup-rank rank-${rankClass}">#${props.ranking}</span>
+        <span class="popup-rank" style="color:${props.color}">#${props.ranking}</span>
         <span class="popup-gestore">${props.gestore}</span>
         <span class="popup-prezzo">${props.prezzo} €/L</span>
       </div>
-      <div class="popup-address">${props.indirizzo}</div>
       <div class="popup-meta">
         <span>${props.distanza} km</span>
-        <span class="popup-badge">${props.self === "true" || props.self === true ? "Self" : "Servito"}</span>
-        <span>${formatDate(props.data)}</span>
+        <span class="popup-badge">${isSelf ? "Self" : "Servito"}</span>
       </div>
+      <div class="popup-updated">Aggiornato ${relativeTime(props.data)}</div>
       <a class="popup-directions" href="${mapsUrl}" target="_blank" rel="noopener noreferrer">Indicazioni</a>
     </div>
   `;
@@ -202,6 +224,9 @@ export default function Map() {
         cluster: true,
         clusterRadius: 40,
         clusterMaxZoom: 15,
+        clusterProperties: {
+          min_prezzo: [["min", ["accumulated"], ["get", "min_prezzo"]], ["get", "prezzo_num"]],
+        },
       });
 
       // Cluster circles
@@ -212,24 +237,33 @@ export default function Map() {
         filter: ["has", "point_count"],
         paint: {
           "circle-radius": 22,
-          "circle-color": "#94a3b8",
-          "circle-stroke-width": 2.5,
+          "circle-color": "#22c55e",
+          "circle-stroke-width": 3,
           "circle-stroke-color": "#ffffff",
           "circle-opacity": 0.9,
         },
       });
 
-      // Cluster count label
+      // Cluster price + count label
       map.addLayer({
         id: CLUSTER_LABEL_ID,
         type: "symbol",
         source: SOURCE_ID,
         filter: ["has", "point_count"],
         layout: {
-          "text-field": "{point_count_abbreviated}",
+          "text-field": [
+            "format",
+            ["number-format", ["get", "min_prezzo"], { "min-fraction-digits": 3, "max-fraction-digits": 3, "locale": "it" }],
+            { "font-scale": 1.0 },
+            "\n",
+            {},
+            ["concat", "×", ["get", "point_count"]],
+            { "font-scale": 0.7 },
+          ],
           "text-size": 12,
           "text-font": ["DIN Pro Bold", "Arial Unicode MS Bold"],
           "text-allow-overlap": true,
+          "text-line-height": 1.2,
         },
         paint: {
           "text-color": "#ffffff",
@@ -244,14 +278,7 @@ export default function Map() {
         filter: ["!", ["has", "point_count"]],
         paint: {
           "circle-radius": 18,
-          "circle-color": [
-            "case",
-            ["<=", ["get", "ranking"], 3],
-            "#22c55e",
-            ["<=", ["get", "ranking"], 10],
-            "#f59e0b",
-            "#ef4444",
-          ],
+          "circle-color": ["get", "color"],
           "circle-stroke-width": 2.5,
           "circle-stroke-color": "#ffffff",
           "circle-opacity": 0.9,
