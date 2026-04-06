@@ -16,9 +16,9 @@ const CLUSTER_LABEL_ID = "distributori-cluster-labels";
 const defaultCenter: [number, number] = [9.19, 45.4642]; // Milano
 
 function toGeoJSON(distributori: Distributore[]): FeatureCollection {
-  const minPrice = distributori.length > 0
-    ? Math.min(...distributori.map((d) => d.prezzo))
-    : 0;
+  const prices = distributori.map((d) => d.prezzo);
+  const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+  const avgPrice = prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
 
   return {
     type: "FeatureCollection",
@@ -39,6 +39,7 @@ function toGeoJSON(distributori: Distributore[]): FeatureCollection {
           prezzo_num: d.prezzo,
           color,
           global_min: minPrice,
+          global_avg: avgPrice,
           self: d.self,
           distanza: d.distanza,
           data: d.data,
@@ -78,9 +79,33 @@ function formatUpdate(dateStr: string): string {
   return relative ? `${relative} (${absolute})` : absolute;
 }
 
+const TANK_LITERS = 40;
+
+function formatEuro(value: number): string {
+  return value.toFixed(2).replace(".", ",") + " €";
+}
+
 function buildPopupHTML(props: Record<string, any>): string {
   const mapsUrl = `https://maps.google.com/?daddr=${props.latitudine},${props.longitudine}`;
   const isSelf = props.self === "true" || props.self === true;
+  const prezzo = Number(props.prezzo_num);
+  const avg = Number(props.global_avg);
+  const min = Number(props.global_min);
+
+  const savingsVsAvg = (avg - prezzo) * TANK_LITERS;
+  const costVsMin = (prezzo - min) * TANK_LITERS;
+
+  let comparisonHTML = "";
+  if (savingsVsAvg > 0.01) {
+    comparisonHTML += `<span class="popup-saving">Risparmi ${formatEuro(savingsVsAvg)} vs media</span>`;
+  } else if (savingsVsAvg < -0.01) {
+    comparisonHTML += `<span class="popup-extra-cost">Spendi ${formatEuro(-savingsVsAvg)} in più vs media</span>`;
+  }
+  if (costVsMin > 0.01) {
+    comparisonHTML += `<span class="popup-extra-cost">+${formatEuro(costVsMin)} vs il più economico</span>`;
+  } else {
+    comparisonHTML += `<span class="popup-saving">Il più economico in zona</span>`;
+  }
 
   return `
     <div class="popup-card">
@@ -93,6 +118,7 @@ function buildPopupHTML(props: Record<string, any>): string {
         <span>${props.distanza} km</span>
         <span class="popup-badge">${isSelf ? "Self" : "Servito"}</span>
       </div>
+      <div class="popup-comparison">${comparisonHTML}</div>
       <div class="popup-updated">Aggiornato ${formatUpdate(props.data)}</div>
       <a class="popup-directions" href="${mapsUrl}" target="_blank" rel="noopener noreferrer">Indicazioni</a>
     </div>

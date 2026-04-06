@@ -234,11 +234,27 @@ body,
     margin-bottom: 4px;
   }
 
-  .popup-updated {
+  .popup-comparison {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 6px;
     font-size: 12px;
+    font-weight: 600;
+  }
+
+  .popup-saving {
+    color: $green;
+  }
+
+  .popup-extra-cost {
+    color: $red;
+  }
+
+  .popup-updated {
+    font-size: 11px;
     color: $text-secondary;
     margin-bottom: 8px;
-    font-weight: 500;
   }
 
   .popup-badge {
