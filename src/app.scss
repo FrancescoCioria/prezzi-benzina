@@ -150,143 +150,137 @@ body,
   }
 }
 
-// === Station List ===
-.station-list {
+// === Search This Area ===
+.search-this-area {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 200;
-  max-height: 45vh;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  background: $surface;
-  border-radius: $radius-lg $radius-lg 0 0;
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.12);
-  padding: 0 12px 20px;
-  padding-bottom: max(20px, env(safe-area-inset-bottom));
-  transform: translateY(calc(100% - 16px));
-  transition: transform 0.3s ease;
+  z-index: 100;
+  height: 44px;
+  bottom: 54px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0 24px;
+  background: $primary;
+  color: $surface;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  border: none;
+  border-radius: 22px;
+  box-shadow: $shadow-md;
+  cursor: pointer;
+  transition: background $transition, transform $transition;
+  -webkit-tap-highlight-color: transparent;
+  white-space: nowrap;
 
-  &.visible {
-    transform: translateY(0);
+  @media (max-width: 768px) {
+    bottom: 74px;
   }
 
-  .list-handle {
-    width: 36px;
-    height: 4px;
-    background: $border;
-    border-radius: 2px;
-    margin: 10px auto 12px;
-    flex-shrink: 0;
-  }
-
-  .list-status {
-    text-align: center;
-    padding: 16px 0;
-    color: $text-secondary;
-    font-size: 14px;
-
-    &.error {
-      color: $red;
-    }
+  &:active {
+    background: $primary-dark;
+    transform: translateX(-50%) scale(0.97);
   }
 }
 
-// === Station Card ===
-.station-card {
-  padding: 12px;
-  border-radius: $radius-sm;
-  margin-bottom: 8px;
-  border: 1.5px solid $border;
-  transition: all $transition;
-  cursor: pointer;
-  position: relative;
+// === Map Popup ===
+.mapboxgl-popup {
+  z-index: 10;
 
-  &:active {
-    transform: scale(0.98);
+  .mapboxgl-popup-content {
+    border-radius: $radius-sm;
+    box-shadow: $shadow-lg;
+    padding: 0;
+    overflow: hidden;
   }
 
-  &.selected {
-    border-color: $primary;
-    background: rgba($primary, 0.04);
-  }
+  .mapboxgl-popup-close-button {
+    font-size: 18px;
+    padding: 4px 8px;
+    color: $text-secondary;
+    right: 2px;
+    top: 2px;
 
-  .station-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 6px;
-
-    .ranking {
-      font-size: 12px;
-      font-weight: 700;
-      min-width: 28px;
-      text-align: center;
-
-      &.rank-top {
-        color: $green;
-      }
-      &.rank-mid {
-        color: $yellow;
-      }
-      &.rank-low {
-        color: $red;
-      }
-    }
-
-    .gestore {
-      font-weight: 600;
-      font-size: 15px;
-      flex: 1;
-    }
-
-    .prezzo {
-      font-size: 16px;
-      font-weight: 700;
+    &:hover {
+      background: none;
       color: $text;
     }
   }
 
-  .station-details {
-    .indirizzo {
-      font-size: 12px;
-      color: $text-secondary;
-      display: block;
-      margin-bottom: 4px;
-      text-transform: capitalize;
-    }
+  .mapboxgl-popup-tip {
+    border-top-color: $surface;
+  }
+}
 
-    .station-meta {
-      display: flex;
-      gap: 12px;
-      font-size: 11px;
-      color: $text-secondary;
+.popup-card {
+  padding: 12px 14px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
-      .self-service {
-        padding: 1px 6px;
-        border-radius: 4px;
-        background: #f1f5f9;
-        font-weight: 500;
-      }
-    }
+  .popup-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
   }
 
-  .directions-btn {
-    position: absolute;
-    right: 12px;
-    bottom: 12px;
-    font-size: 12px;
+  .popup-rank {
+    font-size: 11px;
+    font-weight: 700;
+
+    &.rank-top { color: $green; }
+    &.rank-mid { color: $yellow; }
+    &.rank-low { color: $red; }
+  }
+
+  .popup-gestore {
+    font-weight: 600;
+    font-size: 14px;
+    flex: 1;
+  }
+
+  .popup-prezzo {
+    font-size: 15px;
+    font-weight: 700;
+    color: $text;
+  }
+
+  .popup-address {
+    font-size: 11px;
+    color: $text-secondary;
+    text-transform: capitalize;
+    margin-bottom: 4px;
+    line-height: 1.3;
+  }
+
+  .popup-meta {
+    display: flex;
+    gap: 8px;
+    font-size: 11px;
+    color: $text-secondary;
+    margin-bottom: 8px;
+  }
+
+  .popup-badge {
+    padding: 0 5px;
+    border-radius: 3px;
+    background: #f1f5f9;
+    font-weight: 500;
+  }
+
+  .popup-directions {
+    display: block;
+    text-align: center;
+    font-size: 13px;
     font-weight: 600;
     color: $primary;
     text-decoration: none;
-    padding: 4px 10px;
-    border-radius: 6px;
-    background: rgba($primary, 0.08);
+    padding: 6px 0;
+    border-top: 1px solid $border;
+    margin: 0 -14px;
+    padding: 8px 14px;
     transition: background $transition;
 
     &:active {
-      background: rgba($primary, 0.16);
+      background: rgba($primary, 0.06);
     }
   }
 }

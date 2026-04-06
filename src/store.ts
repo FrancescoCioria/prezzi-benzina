@@ -23,11 +23,8 @@ interface AppState {
   distance: number;
   setDistance: (distance: number) => void;
   results: number;
-  setResults: (results: number) => void;
   distributori: Distributore[];
   setDistributori: (distributori: Distributore[]) => void;
-  selectedDistributore: Distributore | null;
-  setSelectedDistributore: (d: Distributore | null) => void;
   loading: boolean;
   setLoading: (loading: boolean) => void;
   error: string | null;
@@ -46,12 +43,8 @@ export const useAppStore = create<AppState>((set) => ({
     set({ distance });
   },
   results: 20,
-  setResults: (results) => set({ results }),
   distributori: [],
   setDistributori: (distributori) => set({ distributori }),
-  selectedDistributore: null,
-  setSelectedDistributore: (selectedDistributore) =>
-    set({ selectedDistributore }),
   loading: false,
   setLoading: (loading) => set({ loading }),
   error: null,

@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import type { FeatureCollection, Point } from "geojson";
 import type MbMap from "mapbox-gl";
 import { fetchDistributori } from "./api";
@@ -10,6 +10,8 @@ const mapboxgl = window.mapboxgl;
 const SOURCE_ID = "distributori";
 const LAYER_ID = "distributori-circles";
 const LABEL_LAYER_ID = "distributori-labels";
+const CLUSTER_LAYER_ID = "distributori-clusters";
+const CLUSTER_LABEL_ID = "distributori-cluster-labels";
 
 const defaultCenter: [number, number] = [9.19, 45.4642]; // Milano
 
@@ -30,39 +32,86 @@ function toGeoJSON(distributori: Distributore[]): FeatureCollection {
         indirizzo: d.indirizzo,
         distanza: d.distanza,
         data: d.data,
+        latitudine: d.latitudine,
+        longitudine: d.longitudine,
       },
     })),
   };
 }
 
+function formatDate(dateStr: string): string {
+  const [datePart, timePart] = dateStr.split(" ");
+  const [day, month] = datePart.split("/");
+  const months = [
+    "gen", "feb", "mar", "apr", "mag", "giu",
+    "lug", "ago", "set", "ott", "nov", "dic",
+  ];
+  return `${parseInt(day)} ${months[parseInt(month) - 1]}, ${timePart.slice(0, 5)}`;
+}
+
+function buildPopupHTML(props: Record<string, any>): string {
+  const mapsUrl = `https://maps.google.com/?daddr=${props.latitudine},${props.longitudine}`;
+  const rankClass = props.ranking <= 3 ? "top" : props.ranking <= 10 ? "mid" : "low";
+
+  return `
+    <div class="popup-card">
+      <div class="popup-header">
+        <span class="popup-rank rank-${rankClass}">#${props.ranking}</span>
+        <span class="popup-gestore">${props.gestore}</span>
+        <span class="popup-prezzo">${props.prezzo} €/L</span>
+      </div>
+      <div class="popup-address">${props.indirizzo}</div>
+      <div class="popup-meta">
+        <span>${props.distanza} km</span>
+        <span class="popup-badge">${props.self === "true" || props.self === true ? "Self" : "Servito"}</span>
+        <span>${formatDate(props.data)}</span>
+      </div>
+      <a class="popup-directions" href="${mapsUrl}" target="_blank" rel="noopener noreferrer">Indicazioni</a>
+    </div>
+  `;
+}
+
+// Haversine distance in km
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 export default function Map() {
   const mapRef = useRef<MbMap.Map | null>(null);
+  const popupRef = useRef<MbMap.Popup | null>(null);
   const coordsRef = useRef<{ lat: number; lng: number } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const lastSearchCenter = useRef<{ lat: number; lng: number } | null>(null);
+
+  const [showSearchButton, setShowSearchButton] = useState(false);
 
   const fuel = useAppStore((s) => s.fuel);
   const distance = useAppStore((s) => s.distance);
 
-  const fetchAndUpdate = async (lat: number, lng: number) => {
+  const fetchAndUpdate = useCallback(async (lat: number, lng: number) => {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
 
     coordsRef.current = { lat, lng };
-    const { setLoading, setError, setDistributori } =
-      useAppStore.getState();
+    lastSearchCenter.current = { lat, lng };
+    setShowSearchButton(false);
+
+    const { setLoading, setError, setDistributori } = useAppStore.getState();
     const { fuel, distance, results } = useAppStore.getState();
 
     setLoading(true);
     setError(null);
     try {
       const data = await fetchDistributori(
-        lat,
-        lng,
-        distance,
-        fuel,
-        results,
-        controller.signal
+        lat, lng, distance, fuel, results, controller.signal
       );
       if (controller.signal.aborted) return;
       setDistributori(data);
@@ -81,7 +130,14 @@ export default function Map() {
         setLoading(false);
       }
     }
-  };
+  }, []);
+
+  const handleSearchThisArea = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const center = map.getCenter();
+    fetchAndUpdate(center.lat, center.lng);
+  }, [fetchAndUpdate]);
 
   // Re-fetch when filters change
   useEffect(() => {
@@ -121,18 +177,71 @@ export default function Map() {
       "bottom-right"
     );
 
+    // Show "search this area" on pan
+    map.on("moveend", () => {
+      if (!lastSearchCenter.current) return;
+      const center = map.getCenter();
+      const dist = haversineKm(
+        lastSearchCenter.current.lat,
+        lastSearchCenter.current.lng,
+        center.lat,
+        center.lng
+      );
+      const { distance } = useAppStore.getState();
+      if (dist > distance / 3) {
+        setShowSearchButton(true);
+      }
+    });
+
     map.on("load", () => {
       geolocate.trigger();
 
       map.addSource(SOURCE_ID, {
         type: "geojson",
         data: toGeoJSON([]),
+        cluster: true,
+        clusterRadius: 40,
+        clusterMaxZoom: 15,
       });
 
+      // Cluster circles
+      map.addLayer({
+        id: CLUSTER_LAYER_ID,
+        type: "circle",
+        source: SOURCE_ID,
+        filter: ["has", "point_count"],
+        paint: {
+          "circle-radius": 22,
+          "circle-color": "#94a3b8",
+          "circle-stroke-width": 2.5,
+          "circle-stroke-color": "#ffffff",
+          "circle-opacity": 0.9,
+        },
+      });
+
+      // Cluster count label
+      map.addLayer({
+        id: CLUSTER_LABEL_ID,
+        type: "symbol",
+        source: SOURCE_ID,
+        filter: ["has", "point_count"],
+        layout: {
+          "text-field": "{point_count_abbreviated}",
+          "text-size": 12,
+          "text-font": ["DIN Pro Bold", "Arial Unicode MS Bold"],
+          "text-allow-overlap": true,
+        },
+        paint: {
+          "text-color": "#ffffff",
+        },
+      });
+
+      // Individual station circles
       map.addLayer({
         id: LAYER_ID,
         type: "circle",
         source: SOURCE_ID,
+        filter: ["!", ["has", "point_count"]],
         paint: {
           "circle-radius": 18,
           "circle-color": [
@@ -149,10 +258,12 @@ export default function Map() {
         },
       });
 
+      // Price labels on individual markers
       map.addLayer({
         id: LABEL_LAYER_ID,
         type: "symbol",
         source: SOURCE_ID,
+        filter: ["!", ["has", "point_count"]],
         layout: {
           "text-field": ["get", "prezzo"],
           "text-size": 11,
@@ -164,28 +275,53 @@ export default function Map() {
         },
       });
 
+      // Click cluster → zoom in
+      map.on("click", CLUSTER_LAYER_ID, (e: any) => {
+        const features = map.queryRenderedFeatures(e.point, {
+          layers: [CLUSTER_LAYER_ID],
+        });
+        if (!features[0]) return;
+        const clusterId = features[0].properties!.cluster_id;
+        (map.getSource(SOURCE_ID) as any).getClusterExpansionZoom(
+          clusterId,
+          (err: any, zoom: number) => {
+            if (err) return;
+            map.easeTo({
+              center: (features[0].geometry as Point).coordinates as [number, number],
+              zoom,
+            });
+          }
+        );
+      });
+
+      // Click individual marker → popup
       map.on("click", LAYER_ID, (e: any) => {
         if (!e.features?.[0]) return;
         const props = e.features[0].properties!;
-        const coords = (e.features[0].geometry as Point).coordinates;
+        const coords = (e.features[0].geometry as Point)
+          .coordinates as [number, number];
 
-        useAppStore.getState().setSelectedDistributore({
-          ranking: props.ranking,
-          gestore: props.gestore,
-          prezzo: parseFloat(props.prezzo),
-          self: props.self === true || props.self === "true",
-          indirizzo: props.indirizzo,
-          distanza: props.distanza,
-          data: props.data,
-          latitudine: coords[1],
-          longitudine: coords[0],
-        });
+        popupRef.current?.remove();
+        popupRef.current = new mapboxgl.Popup({
+          offset: 20,
+          maxWidth: "300px",
+          closeButton: true,
+        })
+          .setLngLat(coords)
+          .setHTML(buildPopupHTML(props))
+          .addTo(map);
       });
 
       map.on("mouseenter", LAYER_ID, () => {
         map.getCanvas().style.cursor = "pointer";
       });
       map.on("mouseleave", LAYER_ID, () => {
+        map.getCanvas().style.cursor = "";
+      });
+      map.on("mouseenter", CLUSTER_LAYER_ID, () => {
+        map.getCanvas().style.cursor = "pointer";
+      });
+      map.on("mouseleave", CLUSTER_LAYER_ID, () => {
         map.getCanvas().style.cursor = "";
       });
     });
@@ -200,9 +336,14 @@ export default function Map() {
 
     return () => {
       abortRef.current?.abort();
+      popupRef.current?.remove();
       map.remove();
     };
   }, []);
 
-  return null;
+  return showSearchButton ? (
+    <button className="search-this-area" onClick={handleSearchThisArea}>
+      Cerca in questa zona
+    </button>
+  ) : null;
 }

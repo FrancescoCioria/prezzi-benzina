@@ -1,5 +1,4 @@
 import Map from "./Map";
-import StationList from "./StationList";
 import FilterBar from "./FilterBar";
 import "./app.scss";
 
@@ -9,7 +8,6 @@ function App() {
       <FilterBar />
       <div id="map" />
       <Map />
-      <StationList />
     </div>
   );
 }
