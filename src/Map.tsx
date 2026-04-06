@@ -16,17 +16,16 @@ const CLUSTER_LABEL_ID = "distributori-cluster-labels";
 const defaultCenter: [number, number] = [9.19, 45.4642]; // Milano
 
 function toGeoJSON(distributori: Distributore[]): FeatureCollection {
-  // Sort prices to compute percentile thresholds
-  const sorted = [...distributori].sort((a, b) => a.prezzo - b.prezzo);
-  const n = sorted.length;
-  const p33 = n > 0 ? sorted[Math.floor(n / 3)]?.prezzo ?? 0 : 0;
-  const p66 = n > 0 ? sorted[Math.floor((n * 2) / 3)]?.prezzo ?? 0 : 0;
+  const minPrice = distributori.length > 0
+    ? Math.min(...distributori.map((d) => d.prezzo))
+    : 0;
 
   return {
     type: "FeatureCollection",
     features: distributori.map((d) => {
+      const diff = d.prezzo - minPrice;
       const color =
-        d.prezzo <= p33 ? "#22c55e" : d.prezzo <= p66 ? "#f59e0b" : "#ef4444";
+        diff <= 0.05 ? "#22c55e" : diff <= 0.15 ? "#f59e0b" : "#ef4444";
       return {
         type: "Feature" as const,
         geometry: {
