@@ -38,6 +38,7 @@ function toGeoJSON(distributori: Distributore[]): FeatureCollection {
           prezzo: d.prezzo.toFixed(3).replace(".", ","),
           prezzo_num: d.prezzo,
           color,
+          global_min: minPrice,
           self: d.self,
           distanza: d.distanza,
           data: d.data,
@@ -231,10 +232,11 @@ export default function Map() {
         clusterMaxZoom: 15,
         clusterProperties: {
           min_prezzo: [["min", ["accumulated"], ["get", "min_prezzo"]], ["get", "prezzo_num"]],
+          global_min: [["min", ["accumulated"], ["get", "global_min"]], ["get", "global_min"]],
         },
       });
 
-      // Cluster circles
+      // Cluster circles — color by diff between cluster min_prezzo and global_min
       map.addLayer({
         id: CLUSTER_LAYER_ID,
         type: "circle",
@@ -242,7 +244,14 @@ export default function Map() {
         filter: ["has", "point_count"],
         paint: {
           "circle-radius": 22,
-          "circle-color": "#22c55e",
+          "circle-color": [
+            "case",
+            ["<=", ["-", ["get", "min_prezzo"], ["get", "global_min"]], 0.05],
+            "#22c55e",
+            ["<=", ["-", ["get", "min_prezzo"], ["get", "global_min"]], 0.15],
+            "#f59e0b",
+            "#ef4444",
+          ],
           "circle-stroke-width": 3,
           "circle-stroke-color": "#ffffff",
           "circle-opacity": 0.9,
