@@ -42,7 +42,7 @@ export const useAppStore = create<AppState>((set) => ({
     safeSet("distance", String(distance));
     set({ distance });
   },
-  results: 20,
+  results: 200,
   distributori: [],
   setDistributori: (distributori) => set({ distributori }),
   loading: false,
