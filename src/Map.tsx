@@ -293,17 +293,25 @@ export default function Map() {
       "bottom-right"
     );
 
-    // Show "search this area" on pan
+    // Move radius circle + show "search this area" on pan
     map.on("moveend", () => {
       if (!lastSearchCenter.current) return;
       const center = map.getCenter();
+      const { distance } = useAppStore.getState();
+
+      // Move circle to follow map center
+      if (map.getSource(RADIUS_SOURCE)) {
+        (map.getSource(RADIUS_SOURCE) as MbMap.GeoJSONSource).setData(
+          makeCircleGeoJSON(center.lat, center.lng, distance)
+        );
+      }
+
       const dist = haversineKm(
         lastSearchCenter.current.lat,
         lastSearchCenter.current.lng,
         center.lat,
         center.lng
       );
-      const { distance } = useAppStore.getState();
       if (dist > distance / 3) {
         setShowSearchButton(true);
       }
@@ -498,21 +506,11 @@ export default function Map() {
 
     let firstGeolocate = true;
     geolocate.on("geolocate", (e: any) => {
-      const { latitude, longitude } = e.coords;
-      const { distance } = useAppStore.getState();
-
-      // Always move the radius circle to follow the user
-      if (map.getSource(RADIUS_SOURCE)) {
-        (map.getSource(RADIUS_SOURCE) as MbMap.GeoJSONSource).setData(
-          makeCircleGeoJSON(latitude, longitude, distance)
-        );
-      }
-
-      // Only fetch data on first geolocate
       if (firstGeolocate) {
         firstGeolocate = false;
+        const { distance } = useAppStore.getState();
         map.easeTo({ zoom: distanceToZoom(distance) });
-        fetchAndUpdate(latitude, longitude);
+        fetchAndUpdate(e.coords.latitude, e.coords.longitude);
       }
     });
 
