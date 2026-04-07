@@ -2,7 +2,7 @@
 
 Mobile-first web app che mostra i distributori di carburante più economici in zona su mappa.
 
-Live: https://prezzi-brenzina.pages.dev
+Live: https://prezzibenzina.pages.dev
 
 ## Stack
 
@@ -55,7 +55,7 @@ Mostra: ranking, gestore, prezzo, distanza, self/servito, confronto risparmio/co
 ```bash
 npm run dev          # Dev server con proxy API
 npm run build        # TypeScript check + Vite build
-npx wrangler pages deploy dist --project-name prezzi-brenzina  # Deploy
+npx wrangler pages deploy dist --project-name prezzibenzina  # Deploy
 ```
 
 ## Env
