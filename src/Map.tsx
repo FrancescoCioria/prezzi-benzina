@@ -24,17 +24,29 @@ function distanceToZoom(km: number): number {
   return 9;
 }
 
+function detectOutlierPrices(distributori: Distributore[]): Set<number> {
+  if (distributori.length < 5) return new Set();
+  const sorted = distributori.map((d) => d.prezzo).sort((a, b) => a - b);
+  const bottom5 = sorted.slice(0, 5);
+  if (bottom5[0] < bottom5[1] * 0.9) return new Set([bottom5[0]]);
+  return new Set();
+}
+
 function toGeoJSON(distributori: Distributore[]): FeatureCollection {
-  const prices = distributori.map((d) => d.prezzo);
-  const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
-  const avgPrice = prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
+  const outlierPrices = detectOutlierPrices(distributori);
+  const valid = distributori.filter((d) => !outlierPrices.has(d.prezzo));
+  const validPrices = valid.map((d) => d.prezzo);
+  const minPrice = validPrices.length > 0 ? Math.min(...validPrices) : 0;
+  const avgPrice = validPrices.length > 0 ? validPrices.reduce((a, b) => a + b, 0) / validPrices.length : 0;
 
   return {
     type: "FeatureCollection",
     features: distributori.map((d) => {
+      const isOutlier = outlierPrices.has(d.prezzo);
       const diff = d.prezzo - minPrice;
-      const color =
-        diff <= 0.05 ? "#22c55e" : diff <= 0.15 ? "#f59e0b" : "#ef4444";
+      const color = isOutlier
+        ? "#9ca3af"
+        : diff <= 0.05 ? "#22c55e" : diff <= 0.15 ? "#f59e0b" : "#ef4444";
       return {
         type: "Feature" as const,
         geometry: {
@@ -46,7 +58,9 @@ function toGeoJSON(distributori: Distributore[]): FeatureCollection {
           gestore: d.gestore,
           prezzo: d.prezzo.toFixed(3).replace(".", ","),
           prezzo_num: d.prezzo,
+          cluster_prezzo: isOutlier ? 9999 : d.prezzo,
           color,
+          is_outlier: isOutlier,
           global_min: minPrice,
           global_avg: avgPrice,
           self: d.self,
@@ -97,23 +111,28 @@ function formatEuro(value: number): string {
 function buildPopupHTML(props: Record<string, any>): string {
   const mapsUrl = `https://maps.google.com/?daddr=${props.latitudine},${props.longitudine}`;
   const isSelf = props.self === "true" || props.self === true;
+  const isOutlier = props.is_outlier === "true" || props.is_outlier === true;
   const prezzo = Number(props.prezzo_num);
   const avg = Number(props.global_avg);
   const min = Number(props.global_min);
 
-  const savingsVsAvg = (avg - prezzo) * TANK_LITERS;
-  const costVsMin = (prezzo - min) * TANK_LITERS;
-
   let comparisonHTML = "";
-  if (savingsVsAvg > 0.01) {
-    comparisonHTML += `<span class="popup-saving">Risparmi ${formatEuro(savingsVsAvg)} vs media</span>`;
-  } else if (savingsVsAvg < -0.01) {
-    comparisonHTML += `<span class="popup-extra-cost">Spendi ${formatEuro(-savingsVsAvg)} in più vs media</span>`;
-  }
-  if (costVsMin > 0.01) {
-    comparisonHTML += `<span class="popup-extra-cost">+${formatEuro(costVsMin)} vs il più economico</span>`;
+  if (isOutlier) {
+    comparisonHTML = `<span class="popup-outlier">Prezzo anomalo — dato inattendibile</span>`;
   } else {
-    comparisonHTML += `<span class="popup-saving">Il più economico in zona</span>`;
+    const savingsVsAvg = (avg - prezzo) * TANK_LITERS;
+    const costVsMin = (prezzo - min) * TANK_LITERS;
+
+    if (savingsVsAvg > 0.01) {
+      comparisonHTML += `<span class="popup-saving">Risparmi ${formatEuro(savingsVsAvg)} vs media</span>`;
+    } else if (savingsVsAvg < -0.01) {
+      comparisonHTML += `<span class="popup-extra-cost">Spendi ${formatEuro(-savingsVsAvg)} in più vs media</span>`;
+    }
+    if (costVsMin > 0.01) {
+      comparisonHTML += `<span class="popup-extra-cost">+${formatEuro(costVsMin)} vs il più economico</span>`;
+    } else {
+      comparisonHTML += `<span class="popup-saving">Il più economico in zona</span>`;
+    }
   }
 
   return `
@@ -340,7 +359,7 @@ export default function Map() {
         clusterRadius: 40,
         clusterMaxZoom: 15,
         clusterProperties: {
-          min_prezzo: [["min", ["accumulated"], ["get", "min_prezzo"]], ["get", "prezzo_num"]],
+          min_prezzo: [["min", ["accumulated"], ["get", "min_prezzo"]], ["get", "cluster_prezzo"]],
           global_min: [["min", ["accumulated"], ["get", "global_min"]], ["get", "global_min"]],
         },
       });

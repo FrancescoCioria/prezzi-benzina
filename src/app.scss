@@ -251,6 +251,11 @@ body,
     color: $red;
   }
 
+  .popup-outlier {
+    color: $text-secondary;
+    font-style: italic;
+  }
+
   .popup-updated {
     font-size: 11px;
     color: $text-secondary;
