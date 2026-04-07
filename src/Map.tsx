@@ -359,7 +359,8 @@ export default function Map() {
         clusterRadius: 40,
         clusterMaxZoom: 15,
         clusterProperties: {
-          min_prezzo: [["min", ["accumulated"], ["get", "min_prezzo"]], ["get", "cluster_prezzo"]],
+          min_prezzo: [["min", ["accumulated"], ["get", "min_prezzo"]], ["get", "prezzo_num"]],
+          min_prezzo_valid: [["min", ["accumulated"], ["get", "min_prezzo_valid"]], ["get", "cluster_prezzo"]],
           global_min: [["min", ["accumulated"], ["get", "global_min"]], ["get", "global_min"]],
         },
       });
@@ -374,9 +375,9 @@ export default function Map() {
           "circle-radius": 22,
           "circle-color": [
             "case",
-            ["<=", ["-", ["get", "min_prezzo"], ["get", "global_min"]], 0.05],
+            ["<=", ["-", ["get", "min_prezzo_valid"], ["get", "global_min"]], 0.05],
             "#22c55e",
-            ["<=", ["-", ["get", "min_prezzo"], ["get", "global_min"]], 0.15],
+            ["<=", ["-", ["get", "min_prezzo_valid"], ["get", "global_min"]], 0.15],
             "#f59e0b",
             "#ef4444",
           ],
@@ -495,10 +496,24 @@ export default function Map() {
       });
     });
 
+    let firstGeolocate = true;
     geolocate.on("geolocate", (e: any) => {
+      const { latitude, longitude } = e.coords;
       const { distance } = useAppStore.getState();
-      map.easeTo({ zoom: distanceToZoom(distance) });
-      fetchAndUpdate(e.coords.latitude, e.coords.longitude);
+
+      // Always move the radius circle to follow the user
+      if (map.getSource(RADIUS_SOURCE)) {
+        (map.getSource(RADIUS_SOURCE) as MbMap.GeoJSONSource).setData(
+          makeCircleGeoJSON(latitude, longitude, distance)
+        );
+      }
+
+      // Only fetch data on first geolocate
+      if (firstGeolocate) {
+        firstGeolocate = false;
+        map.easeTo({ zoom: distanceToZoom(distance) });
+        fetchAndUpdate(latitude, longitude);
+      }
     });
 
     return () => {
