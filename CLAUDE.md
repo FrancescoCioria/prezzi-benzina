@@ -2,7 +2,7 @@
 
 Mobile-first web app che mostra i distributori di carburante più economici in zona su mappa.
 
-Live: https://prezzibenzina.pages.dev
+Live: https://prezzibenzina.cioria.it (custom domain Pages, CNAME proxato in zona `cioria.it`, 2026-11-01; `prezzibenzina.pages.dev` resta attivo senza redirect per le PWA già installate)
 
 ## Stack
 
